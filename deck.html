@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitHub Copilot SDK: Embed Copilot's Agentic Workflows in Your Application</title>
+<style>
+:root {
+  --navy: #0a1628;
+  --royal-blue: #1e3a5f;
+  --teal: #00d4aa;
+  --orange: #ff6b35;
+  --white: #ffffff;
+  --glass-bg: rgba(30, 58, 95, 0.35);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --text-muted: rgba(255, 255, 255, 0.7);
+  --indigo: #6366f1;
+  --amber: #f59e0b;
+  --font-stack: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  font-family: var(--font-stack); color: var(--white); background: var(--navy);
+}
+
+.deck { width: 100vw; height: 100vh; position: relative; }
+
+.slide {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  padding: 60px 80px;
+  background: linear-gradient(135deg, #0a1628 0%, #12254a 40%, #1a1a3e 100%);
+  opacity: 0; visibility: hidden; transform: translateX(40px);
+  transition: opacity 0.6s ease, transform 0.6s ease, visibility 0.6s ease;
+  overflow-y: auto;
+}
+.slide.active { opacity: 1; visibility: visible; transform: translateX(0); }
+.slide.exit-left { opacity: 0; transform: translateX(-40px); }
+
+.glass {
+  background: var(--glass-bg); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--glass-border); border-radius: 16px; padding: 28px;
+}
+.glass-sm {
+  background: var(--glass-bg); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--glass-border); border-radius: 12px; padding: 18px 22px;
+}
+
+/* ── NAVIGATION ── */
+.arrow-btn {
+  position: fixed; top: 50%; transform: translateY(-50%); z-index: 100;
+  background: var(--glass-bg); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border); color: var(--white);
+  width: 48px; height: 48px; border-radius: 50%;
+  font-size: 22px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.3s, border-color 0.3s;
+}
+.arrow-btn:hover { background: rgba(0,212,170,0.25); border-color: var(--teal); }
+.arrow-btn.prev { left: 24px; }
+.arrow-btn.next { right: 24px; }
+
+.nav-dots {
+  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 12px; z-index: 100;
+}
+.nav-dots .dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: rgba(255,255,255,0.25); border: none; cursor: pointer;
+  transition: background 0.3s, transform 0.3s;
+}
+.nav-dots .dot.active { background: var(--teal); transform: scale(1.3); }
+.nav-dots .dot:hover { background: rgba(0,212,170,0.6); }
+
+.slide-counter {
+  position: fixed; bottom: 30px; right: 40px;
+  font-size: 14px; color: var(--text-muted); z-index: 100;
+}
+
+/* ── UTILITIES ── */
+.section-label {
+  font-size: 12px; text-transform: uppercase; letter-spacing: 2px;
+  color: var(--teal); font-weight: 700; margin-bottom: 6px;
+}
+.slide-title { font-size: 42px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 8px; }
+.slide-subtitle { font-size: 20px; font-weight: 400; color: var(--text-muted); margin-bottom: 32px; }
+.accent-teal { color: var(--teal); }
+.accent-orange { color: var(--orange); }
+
+/* ── TITLE SLIDE ── */
+#slide-title { z-index: 1; }
+#slide-title::before, #slide-title::after {
+  content: ''; position: absolute; border-radius: 50%;
+  filter: blur(100px); opacity: 0.35; pointer-events: none;
+  animation: floatOrb 8s ease-in-out infinite alternate;
+}
+#slide-title::before {
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, #1e3a5f, transparent);
+  top: -200px; right: -150px;
+}
+#slide-title::after {
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(0,212,170,0.4), transparent);
+  bottom: -200px; left: -100px; animation-delay: 2s;
+}
+@keyframes floatOrb {
+  0% { transform: translate(0,0) scale(1); }
+  100% { transform: translate(40px,-30px) scale(1.15); }
+}
+
+.particles { position: absolute; inset: 0; z-index: 1; overflow: hidden; pointer-events: none; }
+.particles span {
+  position: absolute; width: 3px; height: 3px; border-radius: 50%;
+  background: rgba(0,212,170,0.5); animation: drift linear infinite;
+}
+@keyframes drift {
+  0% { transform: translateY(0) translateX(0); opacity: 0; }
+  10% { opacity: 1; } 90% { opacity: 1; }
+  100% { transform: translateY(-100vh) translateX(30px); opacity: 0; }
+}
+
+.title-content { position: relative; z-index: 2; text-align: center; }
+.title-content h1 {
+  font-size: 58px; font-weight: 800; letter-spacing: -1px; line-height: 1.15;
+  background: linear-gradient(135deg, var(--white) 40%, var(--teal));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; margin-bottom: 16px;
+}
+.title-content .phase {
+  font-size: 26px; font-weight: 400; color: var(--teal); margin-bottom: 28px;
+}
+.title-content .tagline {
+  font-size: 18px; color: var(--text-muted); letter-spacing: 1px;
+  padding-top: 24px; border-top: 1px solid var(--glass-border);
+  display: inline-block;
+}
+
+/* ── SLIDE 2: THE GOOD PART ── */
+.good-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+  max-width: 1100px; width: 100%; margin-bottom: 32px;
+}
+.good-card {
+  text-align: center; padding: 24px 16px;
+}
+.good-card .icon { font-size: 36px; margin-bottom: 12px; }
+.good-card h4 { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+.good-card p { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+
+.happy-bar {
+  text-align: center; padding: 16px 28px; border-radius: 12px;
+  background: rgba(0,212,170,0.08); border: 1px solid rgba(0,212,170,0.3);
+  font-size: 16px; color: var(--teal); font-weight: 600;
+  max-width: 700px;
+}
+
+/* ── SLIDE 3: AWKWARD MOMENTS ── */
+.scenarios { display: flex; flex-direction: column; gap: 20px; max-width: 900px; width: 100%; }
+.scenario {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 20px; align-items: center;
+}
+.scenario .who {
+  font-size: 14px; font-weight: 700; color: var(--white); min-width: 120px;
+}
+.scenario .says {
+  font-size: 15px; color: var(--text-muted); font-style: italic; line-height: 1.5;
+}
+.scenario .says q { color: var(--white); font-style: normal; font-weight: 500; }
+.scenario .blocker {
+  font-size: 13px; font-weight: 600; padding: 6px 14px; border-radius: 8px;
+  white-space: nowrap;
+}
+.blocker-ide { background: rgba(255,107,53,0.15); color: var(--orange); border: 1px solid rgba(255,107,53,0.3); }
+.blocker-license { background: rgba(99,102,241,0.15); color: var(--indigo); border: 1px solid rgba(99,102,241,0.3); }
+.blocker-billing { background: rgba(245,158,11,0.15); color: var(--amber); border: 1px solid rgba(245,158,11,0.3); }
+
+/* ── SLIDE 4: THREE GATES ── */
+.gates {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+  max-width: 1000px; width: 100%; margin-bottom: 28px;
+}
+.gate { text-align: center; padding: 32px 24px; }
+.gate .gate-icon { font-size: 40px; margin-bottom: 16px; }
+.gate h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.gate p { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+
+.lock-bar {
+  text-align: center; padding: 14px 28px; border-radius: 12px;
+  background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25);
+  font-size: 14px; color: rgba(239,68,68,0.8); max-width: 800px;
+}
+
+/* ── SLIDE 5: SDK ── */
+.sdk-layout {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 36px;
+  max-width: 1200px; width: 100%;
+}
+.sdk-what h3 { font-size: 18px; font-weight: 700; color: var(--teal); margin-bottom: 16px; }
+.sdk-list { list-style: none; }
+.sdk-list li {
+  font-size: 14px; color: var(--text-muted); padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06); line-height: 1.5;
+  display: flex; align-items: baseline; gap: 10px;
+}
+.sdk-list li::before { content: '\25B8'; color: var(--teal); font-size: 12px; flex-shrink: 0; }
+.sdk-list li:last-child { border-bottom: none; }
+.sdk-list li strong { color: var(--white); }
+
+.sdk-resolves h3 { font-size: 18px; font-weight: 700; color: var(--orange); margin-bottom: 16px; }
+.resolve-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.resolve-item:last-child { border-bottom: none; }
+.resolve-from {
+  font-size: 13px; color: rgba(239,68,68,0.7); text-decoration: line-through;
+  min-width: 180px;
+}
+.resolve-arrow { color: var(--teal); font-size: 16px; }
+.resolve-to { font-size: 13px; color: var(--teal); font-weight: 600; }
+
+/* ── SLIDE 6: LIVE DEMO ── */
+#slide-demo {
+  text-align: center;
+}
+.demo-title {
+  font-size: 64px; font-weight: 800; letter-spacing: -1px;
+  background: linear-gradient(135deg, var(--white) 40%, var(--teal));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; margin-bottom: 24px;
+}
+.demo-subtitle {
+  font-size: 22px; color: var(--text-muted); margin-bottom: 40px;
+}
+.demo-features {
+  display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;
+  max-width: 800px;
+}
+.demo-chip {
+  padding: 8px 18px; border-radius: 20px; font-size: 13px; font-weight: 600;
+  border: 1px solid var(--glass-border); background: var(--glass-bg);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+
+/* ── SLIDE 7: ARCHITECTURE ── */
+.arch-wrapper { max-width: 1100px; width: 100%; }
+.arch-flow {
+  display: flex; align-items: stretch; gap: 0; margin-bottom: 24px;
+  position: relative;
+}
+.arch-col {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  flex: 1; position: relative;
+}
+.arch-box {
+  text-align: center; padding: 16px 12px; width: 100%; position: relative;
+}
+.arch-box .arch-icon { font-size: 28px; margin-bottom: 8px; }
+.arch-box h4 { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+.arch-box p { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+.arch-box.highlight-teal { border-color: rgba(0,212,170,0.4); }
+.arch-box.highlight-teal h4 { color: var(--teal); }
+.arch-box.highlight-orange { border-color: rgba(255,107,53,0.4); }
+.arch-box.highlight-orange h4 { color: var(--orange); }
+.arch-box.highlight-indigo { border-color: rgba(99,102,241,0.4); }
+.arch-box.highlight-indigo h4 { color: var(--indigo); }
+
+.arch-arrow {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; color: rgba(255,255,255,0.3); padding: 0 4px; flex-shrink: 0;
+}
+.arch-arrow.down {
+  transform: rotate(90deg); padding: 4px 0;
+}
+
+.arch-row {
+  display: flex; align-items: center; gap: 0; width: 100%;
+}
+
+.arch-sidebar {
+  display: flex; gap: 20px; justify-content: center; margin-top: 8px;
+}
+.arch-note {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--text-muted);
+  padding: 8px 16px; border-radius: 8px;
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+}
+.arch-note .note-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.arch-note .dot-teal { background: var(--teal); }
+.arch-note .dot-orange { background: var(--orange); }
+.arch-note .dot-indigo { background: var(--indigo); }
+
+.arch-tools-row {
+  display: flex; gap: 10px; justify-content: center; margin-top: 16px; flex-wrap: wrap;
+}
+.arch-tool-chip {
+  padding: 5px 14px; border-radius: 16px; font-size: 12px; font-weight: 600;
+  background: rgba(0,212,170,0.08); border: 1px solid rgba(0,212,170,0.25); color: var(--teal);
+}
+
+/* ── SLIDE 8: CODE HIGHLIGHTS ── */
+.code-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  max-width: 1300px; width: 100%;
+}
+.code-section h3 {
+  font-size: 12px; font-weight: 700; color: var(--teal); text-transform: uppercase;
+  letter-spacing: 1.5px; margin-bottom: 8px;
+}
+.code-block {
+  background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px; padding: 14px 18px; font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 11.5px; line-height: 1.6; overflow-x: auto; color: var(--text-muted);
+  white-space: pre;
+}
+.code-block .kw { color: #c792ea; }
+.code-block .fn { color: #82aaff; }
+.code-block .str { color: #c3e88d; }
+.code-block .cm { color: rgba(255,255,255,0.3); font-style: italic; }
+.code-block .obj { color: #ffcb6b; }
+.code-block .prop { color: #f07178; }
+.code-block .num { color: #f78c6c; }
+
+.code-note {
+  margin-top: 6px; font-size: 11px; color: rgba(255,255,255,0.4);
+  font-style: italic; line-height: 1.4;
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 1100px) {
+  .slide { padding: 40px 36px; }
+  .title-content h1 { font-size: 40px; }
+  .good-grid { grid-template-columns: repeat(2, 1fr); }
+  .scenario { grid-template-columns: 1fr; gap: 8px; }
+  .gates { grid-template-columns: 1fr; }
+  .sdk-layout { grid-template-columns: 1fr; }
+  .code-grid { grid-template-columns: 1fr; }
+  .arch-row { flex-direction: column; gap: 4px; }
+  .arch-arrow { transform: rotate(90deg); }
+  .arch-sidebar { flex-direction: column; align-items: center; }
+  .demo-title { font-size: 44px; }
+}
+</style>
+</head>
+<body>
+<div class="deck">
+
+  <!-- ═══ SLIDE 1: TITLE ═══ -->
+  <div class="slide active" id="slide-title">
+    <div class="particles" id="particles"></div>
+    <div class="title-content">
+      <h1>GitHub Copilot SDK</h1>
+      <div class="phase">Embed Copilot's Agentic Workflows in Your Application</div>
+      <div class="tagline">Taking custom AI agents from local tools to deployed services</div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 2: THE GOOD PART ═══ -->
+  <div class="slide" id="slide-good">
+    <div class="section-label">Where we are</div>
+    <h2 class="slide-title">We Built the Thing</h2>
+    <div class="slide-subtitle">And it works. The team is productive.</div>
+
+    <div class="good-grid">
+      <div class="good-card glass-sm">
+        <div class="icon">📝</div>
+        <h4>Shared Prompts</h4>
+        <p>Reusable prompt templates committed to the repo, available to everyone</p>
+      </div>
+      <div class="good-card glass-sm">
+        <div class="icon">⚡</div>
+        <h4>Custom Skills</h4>
+        <p>Slash commands for code review, testing, documentation generation</p>
+      </div>
+      <div class="good-card glass-sm">
+        <div class="icon">🤖</div>
+        <h4>Custom Agents</h4>
+        <p>Specialized agents for architecture analysis, security review, onboarding</p>
+      </div>
+      <div class="good-card glass-sm">
+        <div class="icon">🏪</div>
+        <h4>Marketplace</h4>
+        <p>Published and shared across the org via Copilot Extensions</p>
+      </div>
+    </div>
+
+    <div class="happy-bar">The team shares knowledge through AI artifacts. This is the good part.</div>
+  </div>
+
+  <!-- ═══ SLIDE 3: AWKWARD MOMENTS ═══ -->
+  <div class="slide" id="slide-awkward">
+    <div class="section-label">But then...</div>
+    <h2 class="slide-title">The Awkward Moments</h2>
+    <div class="slide-subtitle">Three conversations that keep happening</div>
+
+    <div class="scenarios">
+      <div class="scenario glass-sm">
+        <div class="who">🧑‍💼 Product Manager</div>
+        <div class="says">
+          <q>What are the risks and complexity if we replace PayPal with Bank of America?</q><br>
+          They don't have VS Code. They don't have a Copilot license. They just want answers.
+        </div>
+        <div class="blocker blocker-ide">No IDE</div>
+      </div>
+
+      <div class="scenario glass-sm">
+        <div class="who">🧑‍🦰 Any Employee</div>
+        <div class="says">
+          <q>How do I request a second monitor? How do I report business trip expenses?</q><br>
+          Answers are scattered across Confluence, SharePoint, Jira, and Slack. Keyword search won't help. You need semantic search across multiple services.
+        </div>
+        <div class="blocker blocker-license">No Search</div>
+      </div>
+
+      <div class="scenario glass-sm">
+        <div class="who">⚙️ CI/CD Pipeline</div>
+        <div class="says">
+          <q>We want automated code review on every PR. Whose tokens are we burning?</q><br>
+          Your personal tokens shouldn't fund org-wide automation. There's no org-level billing for this.
+        </div>
+        <div class="blocker blocker-billing">Wrong Billing</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 4: COPILOT SDK ═══ -->
+  <div class="slide" id="slide-sdk">
+    <div class="section-label">The solution</div>
+    <h2 class="slide-title">GitHub Copilot SDK</h2>
+    <div class="slide-subtitle">One npm package. Deploy your agents as a service.</div>
+
+    <div class="sdk-layout">
+      <div class="sdk-what glass">
+        <h3>What It Is</h3>
+        <ul class="sdk-list">
+          <li><strong>@github/copilot-sdk</strong> &mdash; npm package, open source</li>
+          <li>Spawns a CLI subprocess that runs the full agent loop</li>
+          <li>Manages sessions, streams events in real-time</li>
+          <li>Built-in tools: <strong>grep</strong>, <strong>view</strong>, <strong>glob</strong>, <strong>bash</strong></li>
+          <li>Define custom agents with specialized prompts and tool restrictions</li>
+          <li>You control the UX, the auth, and the deployment</li>
+        </ul>
+      </div>
+      <div class="sdk-resolves glass">
+        <h3>What It Resolves</h3>
+        <div class="resolve-item">
+          <span class="resolve-from">Individual Copilot license</span>
+          <span class="resolve-arrow">&#x2192;</span>
+          <span class="resolve-to">GitHub OAuth + org API billing</span>
+        </div>
+        <div class="resolve-item">
+          <span class="resolve-from">VS Code / CLI required</span>
+          <span class="resolve-arrow">&#x2192;</span>
+          <span class="resolve-to">Any browser, any device</span>
+        </div>
+        <div class="resolve-item">
+          <span class="resolve-from">Personal token consumption</span>
+          <span class="resolve-arrow">&#x2192;</span>
+          <span class="resolve-to">Centralized org billing</span>
+        </div>
+        <div class="resolve-item">
+          <span class="resolve-from">Developer-only access</span>
+          <span class="resolve-arrow">&#x2192;</span>
+          <span class="resolve-to">PMs, leads, new hires &mdash; anyone</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 6: LIVE DEMO ═══ -->
+  <div class="slide" id="slide-demo">
+    <div class="demo-title">Live Demo</div>
+    <div class="demo-subtitle">Codebase Q&A &mdash; a web app built with Copilot SDK</div>
+    <div class="demo-features">
+      <span class="demo-chip">🔐 GitHub OAuth</span>
+      <span class="demo-chip">📁 Multi-repo support</span>
+      <span class="demo-chip">🤖 Custom agents</span>
+      <span class="demo-chip">📡 Real-time activity timeline</span>
+      <span class="demo-chip">🧠 Claude Haiku 4.5</span>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 7: ARCHITECTURE ═══ -->
+  <div class="slide" id="slide-arch">
+    <div class="section-label">Under the hood</div>
+    <h2 class="slide-title">How It Fits Together</h2>
+    <div class="slide-subtitle">Component architecture of the demo app</div>
+
+    <div class="arch-wrapper">
+      <div class="arch-row">
+        <div class="arch-col">
+          <div class="arch-box glass-sm">
+            <div class="arch-icon">🌐</div>
+            <h4>Browser</h4>
+            <p>Any device, no IDE</p>
+          </div>
+        </div>
+        <div class="arch-arrow">&#x2192;</div>
+        <div class="arch-col">
+          <div class="arch-box glass-sm highlight-indigo">
+            <div class="arch-icon">🖥️</div>
+            <h4>Frontend</h4>
+            <p>UI, chat interface,<br>real-time updates</p>
+          </div>
+        </div>
+        <div class="arch-arrow">&#x2192;</div>
+        <div class="arch-col">
+          <div class="arch-box glass-sm highlight-teal">
+            <div class="arch-icon">⚙️</div>
+            <h4>BFF</h4>
+            <p>Auth, sessions,<br>request orchestration</p>
+          </div>
+        </div>
+        <div class="arch-arrow">&#x2192;</div>
+        <div class="arch-col">
+          <div class="arch-box glass-sm highlight-orange">
+            <div class="arch-icon">📦</div>
+            <h4>Copilot SDK</h4>
+            <p>Agent lifecycle,<br>event streaming</p>
+          </div>
+        </div>
+        <div class="arch-arrow">&#x2192;</div>
+        <div class="arch-col">
+          <div class="arch-box glass-sm">
+            <div class="arch-icon">🤖</div>
+            <h4>Agent Runtime</h4>
+            <p>LLM + tools,<br>agentic loop</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 8: CODE HIGHLIGHTS ═══ -->
+  <div class="slide" id="slide-code" style="padding-top: 36px; padding-bottom: 36px;">
+    <div class="section-label">Under the hood</div>
+    <h2 class="slide-title" style="margin-bottom: 4px;">Key Code Highlights</h2>
+    <div class="slide-subtitle" style="margin-bottom: 18px;">Three pieces that make it work</div>
+
+    <div class="code-grid">
+      <div class="code-section">
+        <h3>1. Client &amp; Session</h3>
+        <div class="code-block">
+<span class="kw">const</span> client = <span class="kw">new</span> <span class="fn">CopilotClient</span>();
+<span class="kw">await</span> client.<span class="fn">start</span>();
+
+<span class="kw">const</span> session = <span class="kw">await</span> client.<span class="fn">createSession</span>({
+  <span class="prop">model</span>: <span class="str">"claude-haiku-4.5"</span>,
+  <span class="prop">workingDirectory</span>: repoPath,
+  <span class="prop">customAgents</span>: CUSTOM_AGENTS,
+  <span class="prop">onPermissionRequest</span>: <span class="kw">async</span> () =&gt;
+    ({ <span class="prop">kind</span>: <span class="str">"approved"</span> }),
+});
+        </div>
+        <div class="code-note">CopilotClient spawns a CLI subprocess. Each session binds to a repo directory.</div>
+      </div>
+
+      <div class="code-section">
+        <h3>2. Custom Agents</h3>
+        <div class="code-block">
+<span class="kw">const</span> CUSTOM_AGENTS = [
+  {
+    <span class="prop">name</span>: <span class="str">"explorer"</span>,
+    <span class="prop">tools</span>: [<span class="str">"grep"</span>, <span class="str">"glob"</span>, <span class="str">"view"</span>],
+    <span class="prop">prompt</span>: <span class="str">"You are a code exploration expert..."</span>
+  },
+  {
+    <span class="prop">name</span>: <span class="str">"analyzer"</span>,
+    <span class="prop">tools</span>: [<span class="str">"grep"</span>, <span class="str">"glob"</span>, <span class="str">"view"</span>],
+    <span class="prop">prompt</span>: <span class="str">"You are a code analysis expert..."</span>
+  },
+  {
+    <span class="prop">name</span>: <span class="str">"architect"</span>,
+    <span class="prop">tools</span>: [<span class="str">"grep"</span>, <span class="str">"glob"</span>, <span class="str">"view"</span>],
+    <span class="prop">prompt</span>: <span class="str">"You are a software architect..."</span>
+  },
+];
+        </div>
+        <div class="code-note">Each agent gets a restricted toolset and a specialized system prompt.</div>
+      </div>
+
+      <div class="code-section" style="grid-column: 1 / -1;">
+        <h3>3. Event-Driven Streaming</h3>
+        <div class="code-block" style="max-width: 100%;">
+<span class="cm">// Subscribe to all session events and stream to browser via SSE</span>
+session.<span class="fn">on</span>((event) =&gt; {
+  res.<span class="fn">write</span>(<span class="str">`data: ${</span><span class="obj">JSON</span>.<span class="fn">stringify</span>(event)<span class="str">}\n\n`</span>);    <span class="cm">// real-time to browser</span>
+});
+
+<span class="kw">await</span> session.<span class="fn">sendAndWait</span>({ <span class="prop">prompt</span>: question }, <span class="num">300000</span>);
+        </div>
+        <div class="code-note">The agentic loop is fully observable. Every tool call, every LLM decision, streamed to the UI in real-time.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Navigation -->
+<button class="arrow-btn prev" id="prevBtn" aria-label="Previous slide">&#x2190;</button>
+<button class="arrow-btn next" id="nextBtn" aria-label="Next slide">&#x2192;</button>
+<div class="nav-dots" id="navDots"></div>
+<div class="slide-counter" id="slideCounter"></div>
+
+<script>
+// Particles
+(function() {
+  var el = document.getElementById('particles');
+  if (!el) return;
+  for (var i = 0; i < 40; i++) {
+    var s = document.createElement('span');
+    s.style.left = Math.random() * 100 + '%';
+    s.style.top = (100 + Math.random() * 20) + '%';
+    s.style.animationDuration = (6 + Math.random() * 10) + 's';
+    s.style.animationDelay = (Math.random() * 8) + 's';
+    s.style.width = (2 + Math.random() * 3) + 'px';
+    s.style.height = s.style.width;
+    if (Math.random() > 0.5) s.style.background = 'rgba(255,107,53,0.4)';
+    el.appendChild(s);
+  }
+})();
+
+// Navigation
+(function() {
+  var slides = document.querySelectorAll('.slide');
+  var total = slides.length;
+  var current = 0;
+  var navDots = document.getElementById('navDots');
+  var counter = document.getElementById('slideCounter');
+  var prevBtn = document.getElementById('prevBtn');
+  var nextBtn = document.getElementById('nextBtn');
+
+  function getFromHash() {
+    var h = window.location.hash.replace('#','');
+    if (!h) return 0;
+    var n = h.match(/^(\d+)$/);
+    if (n) { var v = parseInt(n[1],10); if (v>=1 && v<=total) return v-1; }
+    return 0;
+  }
+  function updateHash() {
+    var nh = '#'+(current+1);
+    if (window.location.hash !== nh) history.replaceState(null,'',nh);
+  }
+
+  var start = getFromHash();
+  if (start > 0) { slides[0].classList.remove('active'); slides[start].classList.add('active'); current = start; }
+
+  for (var i = 0; i < total; i++) {
+    var d = document.createElement('button');
+    d.classList.add('dot');
+    if (i === current) d.classList.add('active');
+    d.setAttribute('aria-label','Go to slide '+(i+1));
+    (function(idx){ d.addEventListener('click',function(){ goTo(idx); }); })(i);
+    navDots.appendChild(d);
+  }
+
+  function updateCounter() { counter.textContent = (current+1)+' / '+total; }
+  function updateArrows() {
+    prevBtn.style.opacity = current===0?'0.3':'1';
+    prevBtn.style.pointerEvents = current===0?'none':'auto';
+    nextBtn.style.opacity = current===total-1?'0.3':'1';
+    nextBtn.style.pointerEvents = current===total-1?'none':'auto';
+  }
+
+  function goTo(idx) {
+    if (idx<0||idx>=total||idx===current) return;
+    var dir = idx>current?1:-1;
+    var old = slides[current], nw = slides[idx];
+    old.classList.remove('active');
+    if (dir===1) old.classList.add('exit-left');
+    nw.style.transition='none';
+    nw.style.transform=dir===1?'translateX(40px)':'translateX(-40px)';
+    nw.style.opacity='0';
+    nw.classList.add('active'); nw.classList.remove('exit-left');
+    void nw.offsetWidth;
+    nw.style.transition=''; nw.style.transform='translateX(0)'; nw.style.opacity='1';
+    setTimeout(function(){ old.classList.remove('exit-left'); old.style.transform=''; old.style.opacity=''; },600);
+    navDots.querySelectorAll('.dot').forEach(function(dd,ii){ dd.classList.toggle('active',ii===idx); });
+    current=idx; updateCounter(); updateArrows(); updateHash();
+  }
+
+  prevBtn.addEventListener('click',function(){ goTo(current-1); });
+  nextBtn.addEventListener('click',function(){ goTo(current+1); });
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowRight'||e.key==='ArrowDown'){e.preventDefault();goTo(current+1);}
+    if(e.key==='ArrowLeft'||e.key==='ArrowUp'){e.preventDefault();goTo(current-1);}
+  });
+  window.addEventListener('hashchange',function(){ var idx=getFromHash(); if(idx!==current) goTo(idx); });
+  updateCounter(); updateArrows(); updateHash();
+})();
+</script>
+</body>
+</html>
