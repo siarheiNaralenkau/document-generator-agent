@@ -1,6 +1,6 @@
 import { CopilotClient } from "@github/copilot-sdk";
-import { CUSTOM_AGENTS } from "../config/agents.config";
-import { CopilotSessionInfo } from "../types";
+import { CUSTOM_AGENTS } from "../config/agents.config.js";
+import { CopilotSessionInfo } from "../types/index.js";
 
 export class CopilotService {
   private sessions: Map<string, CopilotSessionInfo> = new Map();

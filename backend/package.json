@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "build": "tsc",
-    "start": "node dist/main.js"
+    "start": "node --experimental-specifier-resolution=node dist/main.js"
   },
   "dependencies": {
     "@github/copilot-sdk": "^0.1.32",

@@ -2,14 +2,14 @@ import express from "express";
 import session from "express-session";
 import cors from "cors";
 import dotenv from "dotenv";
-import { GitHubService } from "./services/github.service";
-import { CopilotService } from "./services/copilot.service";
-import { SessionManager } from "./services/session-manager";
-import { AuthController } from "./api/auth.controller";
-import { AskController } from "./api/ask.controller";
-import { RepositoriesController } from "./api/repositories.controller";
-import { requireAuth } from "./middleware/auth.middleware";
-import { CUSTOM_AGENTS } from "./config/agents.config";
+import { GitHubService } from "./services/github.service.js";
+import { CopilotService } from "./services/copilot.service.js";
+import { SessionManager } from "./services/session-manager.js";
+import { AuthController } from "./api/auth.controller.js";
+import { AskController } from "./api/ask.controller.js";
+import { RepositoriesController } from "./api/repositories.controller.js";
+import { requireAuth } from "./middleware/auth.middleware.js";
+import { CUSTOM_AGENTS } from "./config/agents.config.js";
 
 dotenv.config();
 

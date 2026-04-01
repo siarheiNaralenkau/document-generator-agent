@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
-import { SessionManager } from "../services/session-manager";
-import { AskRequest } from "../types";
+import { SessionManager } from "../services/session-manager.js";
+import { AskRequest } from "../types/index.js";
 
 export class AskController {
   constructor(private sessionManager: SessionManager) {}
