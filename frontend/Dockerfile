@@ -2,14 +2,10 @@ FROM node:22-slim
 
 WORKDIR /app
 
-# Copy frontend package files
-COPY frontend/package*.json ./
+COPY package*.json ./
 RUN npm ci
 
-# Copy frontend code
-COPY frontend/ .
-
-# Build Next.js
+COPY . .
 RUN node ./node_modules/next/dist/bin/next build
 
 EXPOSE 3000

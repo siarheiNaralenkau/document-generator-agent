@@ -21,7 +21,15 @@ Team Members → GitHub OAuth → Backend (Copilot SDK) → AI Agents → Answer
 
 1. **GitHub Copilot License** - Each team member needs active Copilot subscription
 2. **GitHub OAuth App** - For authentication
-3. **Docker & Docker Compose** - For running the service
+3. **Container Runtime** - One of:
+   - **Docker + Docker Compose**
+   - **Podman + podman-compose** (supported on Windows/Linux)
+
+### Podman Notes (Windows)
+
+- This project supports Podman, including `podman-compose`.
+- If you use Podman, use `podman-compose` commands instead of `docker-compose`.
+- Build contexts are configured per service (`./backend` and `./frontend`) so Podman can discover default `Dockerfile` names reliably.
 
 ## Setup
 
@@ -66,14 +74,23 @@ cd ..
 chmod +x setup.sh
 ./setup.sh
 
-# Build Docker containers
+# Build containers
+# Docker:
 docker-compose build
+# Podman:
+podman-compose build
 
 # Start services
+# Docker:
 docker-compose up -d
+# Podman:
+podman-compose up -d
 
 # Check logs
+# Docker:
 docker-compose logs -f
+# Podman:
+podman-compose logs -f
 ```
 
 ### Step 5: Access the Application
@@ -232,6 +249,9 @@ NEXT_PUBLIC_API_URL=http://localhost:3001
 ### Copilot SDK errors
 **Solution:** Ensure user has active GitHub Copilot license. Check backend logs: `docker-compose logs backend`
 
+### Podman build error: "no Containerfile or Dockerfile specified or found in context directory"
+**Solution:** Make sure you are using the current `docker-compose.yml` from this repo root and run `podman-compose build` there. The compose file uses per-service build contexts (`./backend`, `./frontend`) with default `Dockerfile` names for Podman compatibility.
+
 ### Port already in use
 **Solution:** Stop existing services on ports 3000/3001 or modify ports in `docker-compose.yml`
 
@@ -240,30 +260,48 @@ NEXT_PUBLIC_API_URL=http://localhost:3001
 ```bash
 # Build containers
 docker-compose build
+# (Podman alternative)
+podman-compose build
 
 # Start services
 docker-compose up -d
+# (Podman alternative)
+podman-compose up -d
 
 # Stop services
 docker-compose down
+# (Podman alternative)
+podman-compose down
 
 # View logs
 docker-compose logs -f
+# (Podman alternative)
+podman-compose logs -f
 
 # View backend logs only
 docker-compose logs -f backend
+# (Podman alternative)
+podman-compose logs -f backend
 
 # View frontend logs only
 docker-compose logs -f frontend
+# (Podman alternative)
+podman-compose logs -f frontend
 
 # Restart services
 docker-compose restart
+# (Podman alternative)
+podman-compose restart
 
 # Rebuild and restart
 docker-compose up -d --build
+# (Podman alternative)
+podman-compose up -d --build
 
 # Remove all containers and volumes
 docker-compose down -v
+# (Podman alternative)
+podman-compose down -v
 ```
 
 ## Adding New Repositories
