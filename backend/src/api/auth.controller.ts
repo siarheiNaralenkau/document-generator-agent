@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { GitHubService } from "../services/github.service";
+import { GitHubService } from "../services/github.service.js";
 import crypto from "crypto";
 
 export class AuthController {

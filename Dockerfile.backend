@@ -1,4 +1,4 @@
-FROM node:20-slim
+FROM node:18-slim
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
@@ -23,4 +23,4 @@ RUN mkdir -p /app/sessions
 
 EXPOSE 3001
 
-CMD ["node", "dist/main.js"]
+CMD ["node", "--experimental-specifier-resolution=node", "dist/main.js"]

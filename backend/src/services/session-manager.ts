@@ -1,5 +1,5 @@
-import { CopilotService } from "./copilot.service";
-import { CopilotSessionInfo } from "../types";
+import { CopilotService } from "./copilot.service.js";
+import { CopilotSessionInfo } from "../types/index.js";
 
 export class SessionManager {
   constructor(private copilotService: CopilotService) {}
