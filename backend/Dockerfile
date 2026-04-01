@@ -1,6 +1,6 @@
 FROM node:22-slim
 
-# Install dependencies
+# Install runtime dependencies used by the backend service
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -8,18 +8,13 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy backend package files
-COPY backend/package*.json ./
+COPY package*.json ./
 RUN npm ci
 RUN cp /app/node_modules/vscode-jsonrpc/node.js /app/node_modules/vscode-jsonrpc/node
 
-# Copy backend code
-COPY backend/ .
-
-# Build TypeScript
+COPY . .
 RUN node ./node_modules/typescript/bin/tsc
 
-# Create directories
 RUN mkdir -p /app/sessions
 
 EXPOSE 3001

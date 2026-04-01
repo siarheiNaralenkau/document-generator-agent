@@ -15,6 +15,10 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const isHttpsBaseUrl = (process.env.BASE_URL || "").startsWith("https://");
+const sessionCookieSecure = process.env.SESSION_COOKIE_SECURE
+  ? process.env.SESSION_COOKIE_SECURE === "true"
+  : isHttpsBaseUrl;
 
 // Services
 const githubService = new GitHubService();
@@ -38,7 +42,8 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production",
+      secure: sessionCookieSecure,
+      sameSite: "lax",
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
     },
