@@ -8,8 +8,11 @@ import { SessionManager } from "./services/session-manager.js";
 import { AuthController } from "./api/auth.controller.js";
 import { AskController } from "./api/ask.controller.js";
 import { RepositoriesController } from "./api/repositories.controller.js";
+import { DocumentStatusController } from "./api/document-status.controller.js";
+import { GeneratedDocumentController } from "./api/generated-document.controller.js";
 import { requireAuth } from "./middleware/auth.middleware.js";
 import { CUSTOM_AGENTS } from "./config/agents.config.js";
+import { getUserReposRoot } from "./config/repos.config.js";
 
 dotenv.config();
 
@@ -29,6 +32,8 @@ const sessionManager = new SessionManager(copilotService);
 const authController = new AuthController(githubService);
 const askController = new AskController(sessionManager);
 const repositoriesController = new RepositoriesController();
+const documentStatusController = new DocumentStatusController();
+const generatedDocumentController = new GeneratedDocumentController();
 
 // Middleware
 app.use(cors({
@@ -71,11 +76,35 @@ app.get("/api/agents", requireAuth, (req, res) => {
 });
 
 // Protected routes
-app.get("/api/repositories", requireAuth, repositoriesController.list.bind(repositoriesController));
+app.get(
+  "/api/repositories",
+  requireAuth,
+  repositoriesController.list.bind(repositoriesController)
+);
+app.post(
+  "/api/repositories/clone",
+  requireAuth,
+  repositoriesController.clone.bind(repositoriesController)
+);
 app.post("/api/ask", requireAuth, askController.ask.bind(askController));
+app.get(
+  "/api/document-status",
+  requireAuth,
+  documentStatusController.get.bind(documentStatusController)
+);
+app.post(
+  "/api/generated-document/preview",
+  requireAuth,
+  generatedDocumentController.preview.bind(generatedDocumentController)
+);
+app.post(
+  "/api/generated-document/download",
+  requireAuth,
+  generatedDocumentController.download.bind(generatedDocumentController)
+);
 
 // Start server
 app.listen(PORT, () => {
   console.log(`Backend server running on http://localhost:${PORT}`);
-  console.log(`Repos path: ${process.env.REPOS_PATH || "/repos"}`);
+  console.log(`Repositories root: ${getUserReposRoot()}`);
 });

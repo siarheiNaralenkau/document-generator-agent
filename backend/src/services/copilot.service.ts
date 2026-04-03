@@ -9,9 +9,10 @@ export class CopilotService {
     userId: string,
     githubToken: string,
     repoPath: string,
-    repoName: string
+    repoName: string,
+    model: string
   ): Promise<CopilotSessionInfo> {
-    const sessionId = `${userId}-${repoName}-${Date.now()}`;
+    const sessionId = `${userId}-${repoName}-${model}-${Date.now()}`;
 
     console.log(`Creating Copilot session for user ${userId} on repo ${repoName}`);
 
@@ -25,7 +26,7 @@ export class CopilotService {
 
     // Create session with custom agents
     const session = await client.createSession({
-      model: "claude-haiku-4.5",
+      model,
       workingDirectory: repoPath,
       customAgents: CUSTOM_AGENTS,
       onPermissionRequest: async () => ({ kind: "approved" }),
@@ -35,7 +36,9 @@ export class CopilotService {
       sessionId,
       session,
       repository: repoName,
+      repositoryPath: repoPath,
       userId,
+      model,
     };
 
     this.sessions.set(sessionId, sessionInfo);

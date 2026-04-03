@@ -271,12 +271,12 @@ export class GitHubService {
       state,
     });
 
-    return `https://github.com/login/oauth/authorize?${params}`;
+    return `${process.env.GITHUB_OAUTH_BASE_URL || "https://github.com"}/login/oauth/authorize?${params}`;
   }
 
   async exchangeCodeForToken(code: string): Promise<string> {
     const response = await axios.post(
-      "https://github.com/login/oauth/access_token",
+      `${process.env.GITHUB_OAUTH_BASE_URL || "https://github.com"}/login/oauth/access_token`,
       {
         client_id: this.clientId,
         client_secret: this.clientSecret,
@@ -291,12 +291,15 @@ export class GitHubService {
   }
 
   async getUserInfo(token: string): Promise<{ id: string; login: string }> {
-    const response = await axios.get("https://api.github.com/user", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-      },
-    });
+    const response = await axios.get(
+      `${process.env.GITHUB_API_BASE_URL || "https://api.github.com"}/user`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      }
+    );
 
     return {
       id: response.data.id.toString(),

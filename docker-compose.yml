@@ -8,16 +8,17 @@ services:
     ports:
       - "3001:3001"
     volumes:
-      - ./repos:/repos:ro
       - sessions-data:/app/sessions
+      - user-cloned-repos:/root/.copilot-sdk-demo/repos
     environment:
       - NODE_ENV=production
       - PORT=3001
-      - REPOS_PATH=/repos
       - FRONTEND_URL=http://localhost:3000
       - BASE_URL=http://localhost:3000
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - GITHUB_OAUTH_BASE_URL=${GITHUB_OAUTH_BASE_URL}
+      - GITHUB_API_BASE_URL=${GITHUB_API_BASE_URL}
       - SESSION_SECRET=${SESSION_SECRET}
     restart: unless-stopped
     healthcheck:
@@ -41,3 +42,4 @@ services:
 
 volumes:
   sessions-data:
+  user-cloned-repos:
