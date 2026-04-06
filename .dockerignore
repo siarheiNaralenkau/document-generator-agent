@@ -1,0 +1,11 @@
+node_modules
+.next
+dist
+.git
+repos
+*.log
+.env
+.env.local
+.env.*.local
+sessions-data
+.idea

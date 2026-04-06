@@ -51,38 +51,23 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ## Step 2: Project Structure
 
+Single Node.js process: **Express** (API, OAuth, Copilot SDK) and **Next.js** (App Router UI) share one HTTP server started from `src/server/index.ts`. The client calls same-origin `/api/*` routes (no Next.js rewrites to a separate backend).
+
 ```
 copilot-qa-service/
 ├── docker-compose.yml
-├── Dockerfile.backend
-├── Dockerfile.frontend
+├── Dockerfile
 ├── .env
 ├── .gitignore
 ├── README.md
-├── backend/
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── src/
-│   │   ├── main.ts
-│   │   ├── types/
-│   │   │   └── index.ts
-│   │   ├── middleware/
-│   │   │   └── auth.middleware.ts
-│   │   ├── api/
-│   │   │   ├── auth.controller.ts
-│   │   │   ├── ask.controller.ts
-│   │   │   └── repositories.controller.ts
-│   │   ├── services/
-│   │   │   ├── copilot.service.ts
-│   │   │   ├── session-manager.ts
-│   │   │   └── github.service.ts
-│   │   └── config/
-│   │       └── agents.config.ts
-├── frontend/
-│   ├── package.json
-│   ├── next.config.js
-│   ├── tsconfig.json
-│   ├── app/
+├── package.json
+├── tsconfig.json              # Next.js (src/app)
+├── tsconfig.server.json       # Express (src/server → dist/)
+├── next.config.mjs
+├── tailwind.config.cjs
+├── postcss.config.cjs
+├── src/
+│   ├── app/                   # Next.js UI
 │   │   ├── layout.tsx
 │   │   ├── page.tsx
 │   │   ├── chat/
@@ -93,64 +78,33 @@ copilot-qa-service/
 │   │   │   ├── RepositorySelector.tsx
 │   │   │   ├── AgentActivity.tsx
 │   │   │   └── MessageList.tsx
-│   │   └── api/
-│   │       └── [...all proxy routes]
-│   └── .env.local
-└── repos/
-    └── README.md
+│   │   └── globals.css
+│   └── server/                # Express API + bootstrap
+│       ├── index.ts           # next.prepare() + listen(PORT)
+│       ├── createApp.ts
+│       ├── types/
+│       ├── middleware/
+│       ├── api/
+│       ├── services/
+│       └── config/
+└── (user clones live under ~/.copilot-sdk-demo/repos, not in-repo)
 ```
 
-## Step 3: Backend Implementation
+## Step 3: Backend (Express) and build
 
-### 3.1 package.json
-```json
-{
-  "name": "copilot-qa-backend",
-  "version": "1.0.0",
-  "scripts": {
-    "dev": "tsx watch src/main.ts",
-    "build": "tsc",
-    "start": "node dist/main.js"
-  },
-  "dependencies": {
-    "@github/copilot-sdk": "^1.0.0",
-    "express": "^4.18.2",
-    "express-session": "^1.17.3",
-    "cors": "^2.8.5",
-    "axios": "^1.6.0",
-    "dotenv": "^16.3.1"
-  },
-  "devDependencies": {
-    "@types/express": "^4.17.21",
-    "@types/express-session": "^1.17.10",
-    "@types/cors": "^2.8.17",
-    "@types/node": "^20.10.0",
-    "typescript": "^5.3.0",
-    "tsx": "^4.7.0"
-  }
-}
-```
+The API lives under `src/server/`. The root **`package.json`** merges Next.js and Express dependencies. Scripts:
 
-### 3.2 tsconfig.json
-```json
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "commonjs",
-    "lib": ["ES2022"],
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "moduleResolution": "node"
-  },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules"]
-}
-```
+- **`npm run dev`** — `tsx watch src/server/index.ts` (Express + Next in one process)
+- **`npm run build`** — `next build && tsc -p tsconfig.server.json`
+- **`npm start`** — `node --experimental-specifier-resolution=node dist/index.js`
+
+### 3.1 TypeScript configs
+
+- **`tsconfig.json`** — Next.js (`src/app`, excludes `src/server`)
+- **`tsconfig.server.json`** — compiles `src/server` to `dist/` (ESM, `rootDir` `src/server`)
+
+### 3.2 Legacy reference: backend-only package.json (replaced by root)
+The repository no longer uses a separate `backend/package.json`; use the root `package.json` shown in the repo.
 
 ### 3.3 src/types/index.ts
 ```typescript
@@ -609,129 +563,37 @@ export class AskController {
 }
 ```
 
-### 3.12 src/main.ts
-```typescript
-import express from "express";
-import session from "express-session";
-import cors from "cors";
-import dotenv from "dotenv";
-import { GitHubService } from "./services/github.service";
-import { CopilotService } from "./services/copilot.service";
-import { SessionManager } from "./services/session-manager";
-import { AuthController } from "./api/auth.controller";
-import { AskController } from "./api/ask.controller";
-import { RepositoriesController } from "./api/repositories.controller";
-import { requireAuth } from "./middleware/auth.middleware";
+### 3.12 src/server/createApp.ts and index.ts
 
-dotenv.config();
+The previous single `main.ts` is split into:
 
-const app = express();
-const PORT = process.env.PORT || 3001;
+- **`createApp.ts`** — builds the Express application (CORS, session, `/health`, `/api/*`).
+- **`index.ts`** — `dotenv.config()`, `next({ dev }).prepare()`, mounts the Next.js request handler after Express routes, `listen(process.env.PORT || 3000)`.
 
-// Services
-const githubService = new GitHubService();
-const copilotService = new CopilotService();
-const sessionManager = new SessionManager(copilotService);
+See the repository source for the full implementation.
 
-// Controllers
-const authController = new AuthController(githubService);
-const askController = new AskController(sessionManager);
-const repositoriesController = new RepositoriesController();
+## Step 4: Frontend (Next.js)
 
-// Middleware
-app.use(cors({
-  origin: process.env.FRONTEND_URL || "http://localhost:3000",
-  credentials: true,
-}));
-app.use(express.json());
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "change-this-secret",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === "production",
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    },
-  })
-);
+UI lives under `src/app/`. Dependencies and scripts are in the **root** `package.json` (see Step 3).
 
-// Routes
-app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
-});
+### 4.1 next.config.mjs
 
-// Auth routes
-app.get("/api/auth/login", authController.login.bind(authController));
-app.get("/api/auth/callback", authController.callback.bind(authController));
-app.get("/api/auth/me", authController.me.bind(authController));
-app.post("/api/auth/logout", authController.logout.bind(authController));
+No API rewrites: Express serves `/api/*` on the same port as Next.js.
 
-// Protected routes
-app.get("/api/repositories", requireAuth, repositoriesController.list.bind(repositoriesController));
-app.post("/api/ask", requireAuth, askController.ask.bind(askController));
-
-// Start server
-app.listen(PORT, () => {
-  console.log(`Backend server running on http://localhost:${PORT}`);
-  console.log(`Repos path: ${process.env.REPOS_PATH || "/repos"}`);
-});
-```
-
-## Step 4: Frontend Implementation
-
-### 4.1 package.json
-```json
-{
-  "name": "copilot-qa-frontend",
-  "version": "1.0.0",
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
-  },
-  "dependencies": {
-    "next": "^14.0.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-markdown": "^9.0.0"
-  },
-  "devDependencies": {
-    "@types/node": "^20.10.0",
-    "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0",
-    "autoprefixer": "^10.4.16",
-    "postcss": "^8.4.32",
-    "tailwindcss": "^3.3.6",
-    "typescript": "^5.3.0"
-  }
-}
-```
-
-### 4.2 next.config.js
 ```javascript
 /** @type {import('next').NextConfig} */
-const nextConfig = {
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'http://backend:3001/api/:path*',
-      },
-    ];
-  },
-};
+const nextConfig = {};
 
-module.exports = nextConfig;
+export default nextConfig;
 ```
 
-### 4.3 tailwind.config.js
+### 4.2 tailwind.config.cjs
+
 ```javascript
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
-    './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {},
@@ -740,7 +602,7 @@ module.exports = {
 };
 ```
 
-### 4.4 app/layout.tsx
+### 4.3 app/layout.tsx
 ```typescript
 import './globals.css';
 import type { Metadata } from 'next';
@@ -1172,116 +1034,20 @@ export function AgentActivity({ events }: { events: any[] }) {
 ## Step 5: Docker Setup
 
 ### 5.1 docker-compose.yml
-```yaml
-version: '3.8'
 
-services:
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
-    container_name: copilot-qa-backend
-    ports:
-      - "3001:3001"
-    volumes:
-      - ./repos:/repos:ro
-      - sessions-data:/app/sessions
-    environment:
-      - NODE_ENV=production
-      - PORT=3001
-      - REPOS_PATH=/repos
-      - FRONTEND_URL=http://localhost:3000
-      - BASE_URL=http://localhost:3000
-      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
-      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
-      - SESSION_SECRET=${SESSION_SECRET}
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+Single service **app** on port **3000** (Express + Next.js). See repository root `docker-compose.yml`.
 
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-    container_name: copilot-qa-frontend
-    ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:3001
-    depends_on:
-      - backend
-    restart: unless-stopped
+### 5.2 Dockerfile
 
-volumes:
-  sessions-data:
-```
+Root `Dockerfile`: `npm ci`, vscode-jsonrpc workaround, `npm run build`, `CMD` runs `dist/index.js` with `--experimental-specifier-resolution=node`.
 
-### 5.2 Dockerfile.backend
-```dockerfile
-FROM node:20-slim
-
-# Install dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Copilot CLI
-RUN npm install -g @github/copilot-cli
-
-WORKDIR /app
-
-# Copy backend package files
-COPY backend/package*.json ./
-RUN npm ci
-
-# Copy backend code
-COPY backend/ .
-
-# Build TypeScript
-RUN npm run build
-
-# Create directories
-RUN mkdir -p /app/sessions
-
-EXPOSE 3001
-
-CMD ["node", "dist/main.js"]
-```
-
-### 5.3 Dockerfile.frontend
-```dockerfile
-FROM node:20-slim
-
-WORKDIR /app
-
-# Copy frontend package files
-COPY frontend/package*.json ./
-RUN npm ci
-
-# Copy frontend code
-COPY frontend/ .
-
-# Build Next.js
-RUN npm run build
-
-EXPOSE 3000
-
-CMD ["npm", "start"]
-```
-
-### 5.4 .gitignore
+### 5.3 .gitignore
 ```
 node_modules/
 dist/
 .next/
 .env
 .env.local
-repos/*
-!repos/README.md
 sessions-data/
 *.log
 ```
@@ -1296,9 +1062,8 @@ sessions-data/
 echo "🚀 Setting up Codebase Q&A Service"
 
 # Create directory structure
-mkdir -p backend/src/{api,services,middleware,config,types}
-mkdir -p frontend/app/{components,chat,api}
-mkdir -p repos
+mkdir -p src/app/{components,chat}
+mkdir -p src/server/{api,services,middleware,config,types}
 
 # Create .env file
 if [ ! -f .env ]; then
@@ -1307,33 +1072,22 @@ if [ ! -f .env ]; then
 GITHUB_CLIENT_ID=your_client_id_here
 GITHUB_CLIENT_SECRET=your_client_secret_here
 SESSION_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+NODE_ENV=production
+PORT=3000
+BASE_URL=http://localhost:3000
 EOF
     echo "✅ .env file created. Please update with your GitHub OAuth credentials."
 else
     echo "⚠️  .env file already exists. Skipping."
 fi
 
-# Create repos README
-cat > repos/README.md << EOF
-# Repositories Directory
-
-Place your team's repositories here for the Q&A service to access.
-
-## Example:
-\`\`\`bash
-cd repos
-git clone https://github.com/yourorg/project-a
-git clone https://github.com/yourorg/project-b
-\`\`\`
-EOF
-
 echo "✅ Setup complete!"
 echo ""
 echo "Next steps:"
 echo "1. Update .env with your GitHub OAuth credentials"
-echo "2. Clone repositories into ./repos/"
-echo "3. Run: docker-compose build"
-echo "4. Run: docker-compose up -d"
+echo "2. Run: docker-compose build"
+echo "3. Run: docker-compose up -d"
+echo "4. Clone repositories from the app UI (~/.copilot-sdk-demo/repos)"
 ```
 
 ### 6.2 Quick Start
@@ -1347,20 +1101,14 @@ chmod +x setup.sh
 
 # 3. Update .env with your GitHub OAuth credentials
 
-# 4. Clone repositories
-cd repos
-git clone https://github.com/yourorg/project-a
-git clone https://github.com/yourorg/project-b
-cd ..
-
-# 5. Build and run
+# 4. Build and run
 docker-compose build
 docker-compose up -d
 
-# 6. Check logs
+# 5. Check logs
 docker-compose logs -f
 
-# 7. Access application
+# 6. Access application, clone repos from UI
 open http://localhost:3000
 ```
 
@@ -1387,19 +1135,13 @@ open http://localhost:3000
 
 ### Check Logs
 ```bash
-# All services
-docker-compose logs -f
-
-# Backend only
-docker-compose logs -f backend
-
-# Frontend only
-docker-compose logs -f frontend
+# Application
+docker-compose logs -f app
 ```
 
 ### Health Check
 ```bash
-curl http://localhost:3001/health
+curl http://localhost:3000/health
 ```
 
 ## Troubleshooting
@@ -1410,11 +1152,11 @@ curl http://localhost:3001/health
 
 ### Issue: Copilot SDK errors
 - Ensure user has active Copilot license
-- Check backend logs for authentication errors
+- Check application logs for authentication errors (`docker-compose logs -f app`)
 
 ### Issue: No repositories shown
-- Verify ./repos directory contains git repositories
-- Check backend logs for file system errors
+- Clone a repository from the app UI, or confirm `~/.copilot-sdk-demo/repos` (or the Docker volume) contains git checkouts
+- Check application logs for file system errors
 
 ## Next Steps
 

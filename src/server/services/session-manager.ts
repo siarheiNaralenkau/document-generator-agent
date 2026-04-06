@@ -1,4 +1,5 @@
 import path from "path";
+import { getUserReposRoot } from "../config/repos.config.js";
 import { CopilotService } from "./copilot.service.js";
 import { CopilotSessionInfo } from "../types/index.js";
 
@@ -14,7 +15,7 @@ export class SessionManager {
     model?: string
   ): Promise<CopilotSessionInfo> {
     const repoPath =
-      repositoryPath ?? path.join(process.env.REPOS_PATH || "/repos", repository);
+      repositoryPath ?? path.join(getUserReposRoot(), repository);
 
     const selectedModel =
       model ||

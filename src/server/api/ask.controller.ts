@@ -1,6 +1,9 @@
 import path from "path";
 import { Request, Response } from "express";
-import { ensureAgentGenResultsDirForDate } from "../config/repos.config.js";
+import {
+  ensureAgentGenResultsDirForDate,
+  getUserReposRoot,
+} from "../config/repos.config.js";
 import { SessionManager } from "../services/session-manager.js";
 import { AskRequest } from "../types/index.js";
 
@@ -61,7 +64,7 @@ export class AskController {
 
       try {
         const repoRoot =
-          repositoryPath ?? path.join(process.env.REPOS_PATH || "/repos", repository);
+          repositoryPath ?? path.join(getUserReposRoot(), repository);
 
         let taskText = question;
         if (agent === "document-generator") {
