@@ -90,11 +90,9 @@ export function createApp(): express.Application {
     repositoriesController.clone.bind(repositoriesController)
   );
   app.post("/api/ask", requireAuth, askController.ask.bind(askController));
-  app.get(
-    "/api/document-status",
-    requireAuth,
-    documentStatusController.get.bind(documentStatusController)
-  );
+  // No requireAuth: polling uses long encoded paths; session cookies can be flaky on some hosts.
+  // Only file mtimes for paths under agent-gen-results (see isAuthorizedAgentGenFilePath).
+  app.get("/api/document-status", documentStatusController.get.bind(documentStatusController));
   app.post(
     "/api/generated-document/preview",
     requireAuth,
