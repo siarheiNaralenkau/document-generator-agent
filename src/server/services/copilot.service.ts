@@ -1,36 +1,54 @@
 import { CopilotClient } from "@github/copilot-sdk";
 import { CUSTOM_AGENTS } from "../config/agents.config.js";
 import { CopilotSessionInfo } from "../types/index.js";
+import {
+  getByokProviderType,
+  getByokWireApi,
+} from "../../lib/byok.js";
 
 export class CopilotService {
   private sessions: Map<string, CopilotSessionInfo> = new Map();
 
   async createSession(
     userId: string,
-    githubToken: string,
+    githubToken: string | undefined,
     repoPath: string,
     repoName: string,
-    model: string
+    model: string,
+    useByok: boolean
   ): Promise<CopilotSessionInfo> {
     const sessionId = `${userId}-${repoName}-${model}-${Date.now()}`;
 
     console.log(`Creating Copilot session for user ${userId} on repo ${repoName}`);
 
-    // Set GitHub token in environment for this client
-    process.env.GITHUB_TOKEN = githubToken;
-
-    // Create client with bundled CLI
-    const client = new CopilotClient();
+    const client = useByok
+      ? new CopilotClient({ useLoggedInUser: false })
+      : new CopilotClient({
+          githubToken,
+          useLoggedInUser: false,
+        });
 
     await client.start();
 
-    // Create session with custom agents
-    const session = await client.createSession({
-      model,
-      workingDirectory: repoPath,
-      customAgents: CUSTOM_AGENTS,
-      onPermissionRequest: async () => ({ kind: "approved" }),
-    });
+    const session = useByok
+      ? await client.createSession({
+          model,
+          workingDirectory: repoPath,
+          customAgents: CUSTOM_AGENTS,
+          onPermissionRequest: async () => ({ kind: "approved" }),
+          provider: {
+            type: getByokProviderType(),
+            baseUrl: process.env.MODEL_URL!.trim(),
+            apiKey: process.env.MODEL_API_KEY!.trim(),
+            wireApi: getByokWireApi(),
+          },
+        })
+      : await client.createSession({
+          model,
+          workingDirectory: repoPath,
+          customAgents: CUSTOM_AGENTS,
+          onPermissionRequest: async () => ({ kind: "approved" }),
+        });
 
     const sessionInfo: CopilotSessionInfo = {
       sessionId,

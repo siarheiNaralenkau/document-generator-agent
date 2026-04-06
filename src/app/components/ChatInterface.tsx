@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { RepositorySelector } from './RepositorySelector';
+import { ModelSelector } from './ModelSelector';
 import { MessageList, PRESET_USER_MESSAGE } from './MessageList';
 import { GeneratedDocumentsPanel } from './GeneratedDocumentsPanel';
 import { ActivityTimeline, ActivityEvent } from './ActivityTimeline';
@@ -486,21 +487,7 @@ export function ChatInterface({ user }: { user: any }) {
                 <span className="text-sm text-gray-600">
                   Using <span className="font-medium">document-generator</span> agent
                 </span>
-                <div className="flex items-center gap-2">
-                  <label className="text-sm text-gray-700" htmlFor="model-select">
-                    Model:
-                  </label>
-                  <select
-                    id="model-select"
-                    value={selectedModel}
-                    onChange={(e) => setSelectedModel(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="claude-haiku-4.5">claude-haiku-4.5</option>
-                    <option value="claude-sonnet-4.6">claude-sonnet-4.6</option>
-                    <option value="claude-opus-4.6">claude-opus-4.6</option>
-                  </select>
-                </div>
+                <ModelSelector value={selectedModel} onChange={setSelectedModel} />
                 {selectedRepoPath ? (
                   <div className="flex items-center gap-3 flex-wrap">
                     <button

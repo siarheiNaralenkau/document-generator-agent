@@ -1,20 +1,60 @@
 import path from "path";
 import { Request, Response } from "express";
+import { promises as fs } from "fs";
+import os from "os";
 import {
-  ensureAgentGenResultsDirForDate,
+  ensureAgentGenResultsDirForRepository,
   getUserReposRoot,
 } from "../config/repos.config.js";
 import { SessionManager } from "../services/session-manager.js";
 import { AskRequest } from "../types/index.js";
+import { BYOK_USER_ID, isByokMode } from "../../lib/byok.js";
 
 export class AskController {
   constructor(private sessionManager: SessionManager) {}
 
+  private async fileExists(filePath?: string): Promise<boolean> {
+    if (!filePath) return false;
+    try {
+      const stat = await fs.stat(filePath);
+      return stat.isFile();
+    } catch {
+      return false;
+    }
+  }
+
+  private async resolveGeneratedDocPath(
+    expectedPath: string,
+    filename: string,
+    repoRoot: string
+  ): Promise<string> {
+    if (await this.fileExists(expectedPath)) {
+      return expectedPath;
+    }
+
+    const candidateRoots = [
+      // Preferred repo-scoped location
+      path.join(repoRoot, ".copilot-sdk-demo", "agent-gen-results"),
+      // Legacy location from earlier builds
+      path.join(os.homedir(), ".copilot-sdk-demo", "agent-gen-results"),
+    ];
+
+    for (const root of candidateRoots) {
+      const directCandidate = path.join(root, path.basename(path.dirname(expectedPath)), filename);
+      if (await this.fileExists(directCandidate)) {
+        return directCandidate;
+      }
+    }
+
+    return expectedPath;
+  }
+
   async ask(req: Request, res: Response) {
     const { repository, repositoryPath, question, sessionId, agent, model } =
       req.body as AskRequest;
-    const userId = req.session.userId!;
-    const githubToken = req.session.githubToken!;
+    const useByok = isByokMode();
+    const userId = useByok ? BYOK_USER_ID : req.session.userId!;
+    const githubToken = useByok ? undefined : req.session.githubToken!;
 
     try {
       // Get or create session
@@ -24,7 +64,8 @@ export class AskController {
         repository,
         repositoryPath,
         sessionId,
-        model
+        model,
+        useByok
       );
 
       // Set up SSE - disable buffering for real-time streaming
@@ -69,7 +110,10 @@ export class AskController {
         let taskText = question;
         if (agent === "document-generator") {
           const now = new Date();
-          const outputDir = await ensureAgentGenResultsDirForDate(now);
+          const outputDir = await ensureAgentGenResultsDirForRepository(
+            repoRoot,
+            now
+          );
           const timestamp = `${now.getFullYear()}-${String(
             now.getMonth() + 1
           ).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(
@@ -120,16 +164,29 @@ ${question}`;
           featureDocFilename &&
           finalDocFilename
         ) {
+          // Resolve actual files on disk in case the model wrote to a compatible
+          // repo-scoped/legacy output root different from the initially suggested path.
+          const resolvedFeaturePath = await this.resolveGeneratedDocPath(
+            featureDocPath,
+            featureDocFilename,
+            repoRoot
+          );
+          const resolvedFinalPath = await this.resolveGeneratedDocPath(
+            finalDocPath,
+            finalDocFilename,
+            repoRoot
+          );
+
           completePayload.documents = {
             repo: repository,
             outputDir: docOutputDir,
             feature: {
               filename: featureDocFilename,
-              path: featureDocPath,
+              path: resolvedFeaturePath,
             },
             final: {
               filename: finalDocFilename,
-              path: finalDocPath,
+              path: resolvedFinalPath,
             },
           };
         }

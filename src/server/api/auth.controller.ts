@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { GitHubService } from "../services/github.service.js";
 import crypto from "crypto";
+import { BYOK_USER_ID, isByokMode } from "../../lib/byok.js";
 
 export class AuthController {
   constructor(private githubService: GitHubService) {}
@@ -47,6 +48,15 @@ export class AuthController {
   }
 
   async me(req: Request, res: Response) {
+    if (isByokMode()) {
+      return res.json({
+        authenticated: true,
+        userId: BYOK_USER_ID,
+        username: "BYOK",
+        authMode: "byok" as const,
+      });
+    }
+
     if (!req.session.userId) {
       return res.status(401).json({ authenticated: false });
     }
@@ -55,6 +65,7 @@ export class AuthController {
       authenticated: true,
       userId: req.session.userId,
       username: req.session.username,
+      authMode: "github" as const,
     });
   }
 

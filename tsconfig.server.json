@@ -4,7 +4,7 @@
     "module": "ES2022",
     "lib": ["ES2022"],
     "outDir": "./dist",
-    "rootDir": "./src/server",
+    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -12,6 +12,6 @@
     "resolveJsonModule": true,
     "moduleResolution": "node"
   },
-  "include": ["src/server/**/*.ts"],
+  "include": ["src/server/**/*.ts", "src/lib/**/*.ts"],
   "exclude": ["node_modules"]
 }

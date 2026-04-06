@@ -24,7 +24,8 @@ function formatDateFolder(d: Date): string {
 }
 
 /**
- * ~/.copilot-sdk-demo/agent-gen-results/YYYY-MM-DD (server process home).
+ * @deprecated Prefer {@link getAgentGenResultsRootForRepository} — outputs must live under the
+ * repo so Copilot CLI tools can write (sandbox allows edits inside `workingDirectory` only).
  */
 export function getAgentGenResultsRootForDate(date: Date): string {
   return path.join(
@@ -37,6 +38,31 @@ export function getAgentGenResultsRootForDate(date: Date): string {
 
 export async function ensureAgentGenResultsDirForDate(date: Date): Promise<string> {
   const dir = getAgentGenResultsRootForDate(date);
+  await fs.mkdir(dir, { recursive: true });
+  return dir;
+}
+
+/**
+ * Generated docs under the clone: `{repoRoot}/.copilot-sdk-demo/agent-gen-results/YYYY-MM-DD/`.
+ * Keeps paths inside the Copilot session workspace so read/search/edit can write (BYOK and OAuth).
+ */
+export function getAgentGenResultsRootForRepository(
+  repoRoot: string,
+  date: Date
+): string {
+  return path.join(
+    repoRoot,
+    ".copilot-sdk-demo",
+    "agent-gen-results",
+    formatDateFolder(date)
+  );
+}
+
+export async function ensureAgentGenResultsDirForRepository(
+  repoRoot: string,
+  date: Date
+): Promise<string> {
+  const dir = getAgentGenResultsRootForRepository(repoRoot, date);
   await fs.mkdir(dir, { recursive: true });
   return dir;
 }

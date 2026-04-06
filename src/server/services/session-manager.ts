@@ -8,11 +8,12 @@ export class SessionManager {
 
   async getOrCreateSession(
     userId: string,
-    githubToken: string,
+    githubToken: string | undefined,
     repository: string,
     repositoryPath: string | undefined,
     sessionId?: string,
-    model?: string
+    model?: string,
+    useByok?: boolean
   ): Promise<CopilotSessionInfo> {
     const repoPath =
       repositoryPath ?? path.join(getUserReposRoot(), repository);
@@ -42,7 +43,8 @@ export class SessionManager {
       githubToken,
       repoPath,
       repository,
-      selectedModel
+      selectedModel,
+      Boolean(useByok)
     );
   }
 }

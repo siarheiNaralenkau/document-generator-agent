@@ -19,4 +19,4 @@ RUN mkdir -p /app/sessions
 EXPOSE 3000
 
 ENV NODE_ENV=production
-CMD ["node", "--experimental-specifier-resolution=node", "dist/index.js"]
+CMD ["node", "--experimental-specifier-resolution=node", "dist/server/index.js"]

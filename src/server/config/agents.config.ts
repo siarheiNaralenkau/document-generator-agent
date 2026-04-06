@@ -48,7 +48,7 @@ Transform feature-level requirements into a structured Business Requirements Doc
 ## Request context (provided with each user message)
 Each request includes absolute paths in a [Context for this request] block:
 - **Repository root** — analyze this codebase (your tools operate from this root).
-- **Output directory** — write **all** generated files **only** under this folder for this run (typically \`~/.copilot-sdk-demo/agent-gen-results/YYYY-MM-DD\` on the server).
+- **Output directory** — write **all** generated files **only** under this folder for this run (under the repository at \`.copilot-sdk-demo/agent-gen-results/YYYY-MM-DD/\` so tools can write inside the workspace sandbox).
 - **Feature-level requirements output file** — absolute path where you must write the feature-level requirements file (includes repository name and timestamp).
 - **Final Business Requirements Document output file** — absolute path where you must write the consolidated BRD file (includes repository name and timestamp).
 
