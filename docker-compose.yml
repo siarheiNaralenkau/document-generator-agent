@@ -14,11 +14,11 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - BASE_URL=http://localhost:3000
-      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
-      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
-      - GITHUB_OAUTH_BASE_URL=${GITHUB_OAUTH_BASE_URL}
-      - GITHUB_API_BASE_URL=${GITHUB_API_BASE_URL}
-      - SESSION_SECRET=${SESSION_SECRET}
+      - MODEL_URL=${MODEL_URL}
+      - MODEL_API_KEY=${MODEL_API_KEY}
+      - MODEL_PROVIDER=${MODEL_PROVIDER}
+      - MODEL_WIRE_API=${MODEL_WIRE_API}
+      - COPILOT_MODEL=${COPILOT_MODEL}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]

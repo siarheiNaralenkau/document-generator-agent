@@ -11,44 +11,30 @@ export class CopilotService {
 
   async createSession(
     userId: string,
-    githubToken: string | undefined,
     repoPath: string,
     repoName: string,
-    model: string,
-    useByok: boolean
+    model: string
   ): Promise<CopilotSessionInfo> {
     const sessionId = `${userId}-${repoName}-${model}-${Date.now()}`;
 
     console.log(`Creating Copilot session for user ${userId} on repo ${repoName}`);
 
-    const client = useByok
-      ? new CopilotClient({ useLoggedInUser: false })
-      : new CopilotClient({
-          githubToken,
-          useLoggedInUser: false,
-        });
+    const client = new CopilotClient({ useLoggedInUser: false });
 
     await client.start();
 
-    const session = useByok
-      ? await client.createSession({
-          model,
-          workingDirectory: repoPath,
-          customAgents: CUSTOM_AGENTS,
-          onPermissionRequest: async () => ({ kind: "approved" }),
-          provider: {
-            type: getByokProviderType(),
-            baseUrl: process.env.MODEL_URL!.trim(),
-            apiKey: process.env.MODEL_API_KEY!.trim(),
-            wireApi: getByokWireApi(),
-          },
-        })
-      : await client.createSession({
-          model,
-          workingDirectory: repoPath,
-          customAgents: CUSTOM_AGENTS,
-          onPermissionRequest: async () => ({ kind: "approved" }),
-        });
+    const session = await client.createSession({
+      model,
+      workingDirectory: repoPath,
+      customAgents: CUSTOM_AGENTS,
+      onPermissionRequest: async () => ({ kind: "approved" }),
+      provider: {
+        type: getByokProviderType(),
+        baseUrl: process.env.MODEL_URL!.trim(),
+        apiKey: process.env.MODEL_API_KEY!.trim(),
+        wireApi: getByokWireApi(),
+      },
+    });
 
     const sessionInfo: CopilotSessionInfo = {
       sessionId,

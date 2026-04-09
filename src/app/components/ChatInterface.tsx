@@ -13,7 +13,7 @@ interface Message {
 }
 
 /** Same-origin `/api/*` is proxied to the backend via `next.config.js` rewrites (BACKEND_URL). Avoids broken absolute URLs when NEXT_PUBLIC_API_URL is mis-set. */
-const ASK_API_URL = '/api/ask';
+const GENERATE_REQUIREMENTS_API_URL = '/api/generate-requirements';
 
 const GENERATE_DOCS_PROMPT =
   'Run the full two-phase BRD workflow from your instructions: Phase 1 feature-level requirements analysis, then Phase 2 BRD consolidation. Use the Repository root and Output directory from the context block. Produce feature-level-requirements.txt and FinalCopilot-requirements-response.md in the Output directory.';
@@ -90,17 +90,9 @@ export function ChatInterface({ user }: { user: any }) {
     }, 6000);
   }, []);
 
-  const handleLogout = async () => {
-    await fetch('/api/auth/logout', {
-      method: 'POST',
-      credentials: 'include',
-    });
-    window.location.href = '/';
-  };
-
   const selectedRepoEntry = repositories.find((r) => r.path === selectedRepoPath);
 
-  const runAsk = async (questionBody: string, userDisplayMessage: string) => {
+  const runRequirementsGeneration = async (requirementsPrompt: string, userDisplayMessage: string) => {
     if (!selectedRepoPath || !selectedRepoEntry) return;
 
     setIsLoading(true);
@@ -118,14 +110,14 @@ export function ChatInterface({ user }: { user: any }) {
 
     try {
       // Call backend directly to bypass Next.js proxy buffering for SSE
-      const response = await fetch(ASK_API_URL, {
+      const response = await fetch(GENERATE_REQUIREMENTS_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           repository: selectedRepoEntry.name,
           repositoryPath: selectedRepoEntry.path,
-          question: questionBody,
+          requirementsPrompt,
           sessionId,
           agent: 'document-generator',
           model: selectedModel,
@@ -416,7 +408,7 @@ export function ChatInterface({ user }: { user: any }) {
     ) {
       return;
     }
-    await runAsk(GENERATE_DOCS_PROMPT, PRESET_USER_MESSAGE);
+    await runRequirementsGeneration(GENERATE_DOCS_PROMPT, PRESET_USER_MESSAGE);
   };
 
   const addRepositoryFromUrl = async () => {
@@ -520,12 +512,6 @@ export function ChatInterface({ user }: { user: any }) {
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-600">{user.username}</span>
-            <button
-              onClick={handleLogout}
-              className="text-sm text-gray-600 hover:text-gray-900"
-            >
-              Logout
-            </button>
           </div>
         </div>
       </div>

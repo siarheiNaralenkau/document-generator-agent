@@ -7,10 +7,10 @@ import {
   getUserReposRoot,
 } from "../config/repos.config.js";
 import { SessionManager } from "../services/session-manager.js";
-import { AskRequest } from "../types/index.js";
-import { BYOK_USER_ID, isByokMode } from "../../lib/byok.js";
+import { GenerateRequirementsRequest } from "../types/index.js";
+import { BYOK_USER_ID } from "../../lib/byok.js";
 
-export class AskController {
+export class RequirementsController {
   constructor(private sessionManager: SessionManager) {}
 
   private async fileExists(filePath?: string): Promise<boolean> {
@@ -40,7 +40,11 @@ export class AskController {
     ];
 
     for (const root of candidateRoots) {
-      const directCandidate = path.join(root, path.basename(path.dirname(expectedPath)), filename);
+      const directCandidate = path.join(
+        root,
+        path.basename(path.dirname(expectedPath)),
+        filename
+      );
       if (await this.fileExists(directCandidate)) {
         return directCandidate;
       }
@@ -49,23 +53,25 @@ export class AskController {
     return expectedPath;
   }
 
-  async ask(req: Request, res: Response) {
-    const { repository, repositoryPath, question, sessionId, agent, model } =
-      req.body as AskRequest;
-    const useByok = isByokMode();
-    const userId = useByok ? BYOK_USER_ID : req.session.userId!;
-    const githubToken = useByok ? undefined : req.session.githubToken!;
+  async generateRequirements(req: Request, res: Response) {
+    const {
+      repository,
+      repositoryPath,
+      requirementsPrompt,
+      sessionId,
+      agent,
+      model,
+    } = req.body as GenerateRequirementsRequest;
+    const userId = BYOK_USER_ID;
 
     try {
       // Get or create session
       const sessionInfo = await this.sessionManager.getOrCreateSession(
         userId,
-        githubToken,
         repository,
         repositoryPath,
         sessionId,
-        model,
-        useByok
+        model
       );
 
       // Set up SSE - disable buffering for real-time streaming
@@ -107,7 +113,7 @@ export class AskController {
         const repoRoot =
           repositoryPath ?? path.join(getUserReposRoot(), repository);
 
-        let taskText = question;
+        let taskText = requirementsPrompt;
         if (agent === "document-generator") {
           const now = new Date();
           const outputDir = await ensureAgentGenResultsDirForRepository(
@@ -137,7 +143,7 @@ Output directory (write all generated files only under this path for this run): 
 Feature-level requirements output file (write exactly to this absolute path): ${featureDocPath}
 Final Business Requirements Document output file (write exactly to this absolute path): ${finalDocPath}
 
-${question}`;
+${requirementsPrompt}`;
         }
 
         // Build prompt - prefix with agent instruction if specified
@@ -146,7 +152,7 @@ ${question}`;
             ? `Use the @${agent} agent to answer this: ${taskText}`
             : taskText;
 
-        // Send question to Copilot with increased timeout (5 minutes)
+        // Send prompt to Copilot with increased timeout (15 minutes)
         await sessionInfo.session.sendAndWait({ prompt }, 900000);
 
         // Send completion event with the last top-level response
@@ -193,7 +199,7 @@ ${question}`;
 
         res.write(`data: ${JSON.stringify(completePayload)}\n\n`);
       } catch (error: any) {
-        console.error("Error during question processing:", error);
+        console.error("Error during requirements generation:", error);
         res.write(
           `data: ${JSON.stringify({
             type: "error",
@@ -205,7 +211,7 @@ ${question}`;
         res.end();
       }
     } catch (error: any) {
-      console.error("Error in ask controller:", error);
+      console.error("Error in requirements controller:", error);
       res.status(500).json({ error: error.message });
     }
   }

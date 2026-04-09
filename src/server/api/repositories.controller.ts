@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import { promises as fs } from "fs";
 import path from "path";
-import axios from "axios";
 import { spawn } from "child_process";
 import { ensureUserReposRoot, getUserReposRoot } from "../config/repos.config.js";
 
@@ -19,20 +18,8 @@ async function listRepoDirectories(root: string): Promise<{ name: string; path: 
   }
 }
 
-function normalizeGithubApiBase(): string {
-  const raw = (process.env.GITHUB_API_BASE_URL || "https://api.github.com").replace(/\/$/, "");
-  return raw;
-}
-
 function getAllowedCloneHosts(): Set<string> {
-  const hosts = new Set<string>(["github.com"]);
-  try {
-    const oauth = new URL(process.env.GITHUB_OAUTH_BASE_URL || "https://github.com");
-    hosts.add(oauth.hostname.toLowerCase());
-  } catch {
-    /* ignore */
-  }
-  return hosts;
+  return new Set<string>(["github.com"]);
 }
 
 function parseGithubOwnerRepoFromHttps(url: URL): { owner: string; repo: string } | null {
@@ -112,47 +99,19 @@ export class RepositoriesController {
         return;
       }
 
-      const apiBase = normalizeGithubApiBase();
-      const apiPath = `${apiBase}/repos/${ownerRepo.owner}/${ownerRepo.repo}`;
-      const token = req.session.githubToken;
-
-      let repoMeta: { private?: boolean };
+      const cloneUrl = `https://${parsed.hostname}/${ownerRepo.owner}/${ownerRepo.repo}.git`;
       try {
-        const baseHeaders: Record<string, string> = { Accept: "application/vnd.github+json" };
-        let ghRes = await axios.get(apiPath, { headers: baseHeaders, validateStatus: () => true });
-        if ((ghRes.status === 401 || ghRes.status === 403) && token) {
-          ghRes = await axios.get(apiPath, {
-            headers: { ...baseHeaders, Authorization: `Bearer ${token}` },
-            validateStatus: () => true,
-          });
-        }
-        if (ghRes.status === 404) {
-          res.status(400).json({ error: "Repository not found or not accessible" });
-          return;
-        }
-        if (ghRes.status !== 200) {
-          res.status(400).json({
-            error: ghRes.data?.message || `GitHub API error (${ghRes.status})`,
-          });
-          return;
-        }
-        repoMeta = ghRes.data;
+        // Fast, auth-free reachability check. Private repos are inaccessible in BYOK-only mode.
+        await runGit(["ls-remote", "--heads", cloneUrl]);
       } catch (e: any) {
-        console.error("GitHub repo check failed:", e);
-        res.status(400).json({ error: e?.message || "Failed to verify repository" });
-        return;
-      }
-
-      if (repoMeta.private === true) {
-        res.status(400).json({ error: "Only public repositories can be added by URL" });
+        console.error("Repository reachability check failed:", e);
+        res.status(400).json({ error: "Repository not found or not accessible (public https GitHub repos only)" });
         return;
       }
 
       const userRoot = await ensureUserReposRoot();
       const targetDirName = `${ownerRepo.owner}-${ownerRepo.repo}`;
       const targetPath = path.join(userRoot, targetDirName);
-
-      const cloneUrl = `https://${parsed.hostname}/${ownerRepo.owner}/${ownerRepo.repo}.git`;
 
       try {
         await fs.access(path.join(targetPath, ".git"));
