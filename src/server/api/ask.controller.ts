@@ -147,7 +147,7 @@ ${question}`;
             : taskText;
 
         // Send question to Copilot with increased timeout (5 minutes)
-        await sessionInfo.session.sendAndWait({ prompt }, 300000);
+        await sessionInfo.session.sendAndWait({ prompt }, 900000);
 
         // Send completion event with the last top-level response
         const completePayload: any = {
