@@ -1,6 +1,6 @@
 import path from "path";
 
-/** Paths under ~/.copilot-sdk-demo/agent-gen-results are allowed for read/download. */
+/** Paths containing `.copilot-sdk-demo/agent-gen-results` (per-repo or legacy home layout) for read/download. */
 export function isAuthorizedAgentGenFilePath(filePath: string): boolean {
   if (!filePath || typeof filePath !== "string") return false;
   const normalized = path.normalize(filePath);

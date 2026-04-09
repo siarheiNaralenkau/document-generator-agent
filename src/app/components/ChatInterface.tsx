@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { RepositorySelector } from './RepositorySelector';
+import { ModelSelector } from './ModelSelector';
 import { MessageList, PRESET_USER_MESSAGE } from './MessageList';
 import { GeneratedDocumentsPanel } from './GeneratedDocumentsPanel';
 import { ActivityTimeline, ActivityEvent } from './ActivityTimeline';
@@ -12,7 +13,7 @@ interface Message {
 }
 
 /** Same-origin `/api/*` is proxied to the backend via `next.config.js` rewrites (BACKEND_URL). Avoids broken absolute URLs when NEXT_PUBLIC_API_URL is mis-set. */
-const ASK_API_URL = '/api/ask';
+const GENERATE_REQUIREMENTS_API_URL = '/api/generate-requirements';
 
 const GENERATE_DOCS_PROMPT =
   'Run the full two-phase BRD workflow from your instructions: Phase 1 feature-level requirements analysis, then Phase 2 BRD consolidation. Use the Repository root and Output directory from the context block. Produce feature-level-requirements.txt and FinalCopilot-requirements-response.md in the Output directory.';
@@ -89,17 +90,9 @@ export function ChatInterface({ user }: { user: any }) {
     }, 6000);
   }, []);
 
-  const handleLogout = async () => {
-    await fetch('/api/auth/logout', {
-      method: 'POST',
-      credentials: 'include',
-    });
-    window.location.href = '/';
-  };
-
   const selectedRepoEntry = repositories.find((r) => r.path === selectedRepoPath);
 
-  const runAsk = async (questionBody: string, userDisplayMessage: string) => {
+  const runRequirementsGeneration = async (requirementsPrompt: string, userDisplayMessage: string) => {
     if (!selectedRepoPath || !selectedRepoEntry) return;
 
     setIsLoading(true);
@@ -117,14 +110,14 @@ export function ChatInterface({ user }: { user: any }) {
 
     try {
       // Call backend directly to bypass Next.js proxy buffering for SSE
-      const response = await fetch(ASK_API_URL, {
+      const response = await fetch(GENERATE_REQUIREMENTS_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           repository: selectedRepoEntry.name,
           repositoryPath: selectedRepoEntry.path,
-          question: questionBody,
+          requirementsPrompt,
           sessionId,
           agent: 'document-generator',
           model: selectedModel,
@@ -415,7 +408,7 @@ export function ChatInterface({ user }: { user: any }) {
     ) {
       return;
     }
-    await runAsk(GENERATE_DOCS_PROMPT, PRESET_USER_MESSAGE);
+    await runRequirementsGeneration(GENERATE_DOCS_PROMPT, PRESET_USER_MESSAGE);
   };
 
   const addRepositoryFromUrl = async () => {
@@ -486,21 +479,7 @@ export function ChatInterface({ user }: { user: any }) {
                 <span className="text-sm text-gray-600">
                   Using <span className="font-medium">document-generator</span> agent
                 </span>
-                <div className="flex items-center gap-2">
-                  <label className="text-sm text-gray-700" htmlFor="model-select">
-                    Model:
-                  </label>
-                  <select
-                    id="model-select"
-                    value={selectedModel}
-                    onChange={(e) => setSelectedModel(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="claude-haiku-4.5">claude-haiku-4.5</option>
-                    <option value="claude-sonnet-4.6">claude-sonnet-4.6</option>
-                    <option value="claude-opus-4.6">claude-opus-4.6</option>
-                  </select>
-                </div>
+                <ModelSelector value={selectedModel} onChange={setSelectedModel} />
                 {selectedRepoPath ? (
                   <div className="flex items-center gap-3 flex-wrap">
                     <button
@@ -533,12 +512,6 @@ export function ChatInterface({ user }: { user: any }) {
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-600">{user.username}</span>
-            <button
-              onClick={handleLogout}
-              className="text-sm text-gray-600 hover:text-gray-900"
-            >
-              Logout
-            </button>
           </div>
         </div>
       </div>

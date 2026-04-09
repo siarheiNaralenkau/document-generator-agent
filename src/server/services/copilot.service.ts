@@ -1,13 +1,16 @@
 import { CopilotClient } from "@github/copilot-sdk";
 import { CUSTOM_AGENTS } from "../config/agents.config.js";
 import { CopilotSessionInfo } from "../types/index.js";
+import {
+  getByokProviderType,
+  getByokWireApi,
+} from "../../lib/byok.js";
 
 export class CopilotService {
   private sessions: Map<string, CopilotSessionInfo> = new Map();
 
   async createSession(
     userId: string,
-    githubToken: string,
     repoPath: string,
     repoName: string,
     model: string
@@ -16,20 +19,21 @@ export class CopilotService {
 
     console.log(`Creating Copilot session for user ${userId} on repo ${repoName}`);
 
-    // Set GitHub token in environment for this client
-    process.env.GITHUB_TOKEN = githubToken;
-
-    // Create client with bundled CLI
-    const client = new CopilotClient();
+    const client = new CopilotClient({ useLoggedInUser: false });
 
     await client.start();
 
-    // Create session with custom agents
     const session = await client.createSession({
       model,
       workingDirectory: repoPath,
       customAgents: CUSTOM_AGENTS,
       onPermissionRequest: async () => ({ kind: "approved" }),
+      provider: {
+        type: getByokProviderType(),
+        baseUrl: process.env.MODEL_URL!.trim(),
+        apiKey: process.env.MODEL_API_KEY!.trim(),
+        wireApi: getByokWireApi(),
+      },
     });
 
     const sessionInfo: CopilotSessionInfo = {

@@ -6,15 +6,13 @@
   "scripts": {
     "dev": "tsx watch src/server/index.ts",
     "build": "next build && tsc -p tsconfig.server.json",
-    "start": "node --experimental-specifier-resolution=node dist/index.js"
+    "start": "node --experimental-specifier-resolution=node dist/server/index.js"
   },
   "dependencies": {
     "@github/copilot-sdk": "^0.2.0",
-    "axios": "^1.6.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
-    "express-session": "^1.17.3",
     "next": "^14.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -23,7 +21,6 @@
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
-    "@types/express-session": "^1.17.10",
     "@types/node": "^20.10.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",

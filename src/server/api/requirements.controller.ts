@@ -1,26 +1,73 @@
 import path from "path";
 import { Request, Response } from "express";
+import { promises as fs } from "fs";
+import os from "os";
 import {
-  ensureAgentGenResultsDirForDate,
+  ensureAgentGenResultsDirForRepository,
   getUserReposRoot,
 } from "../config/repos.config.js";
 import { SessionManager } from "../services/session-manager.js";
-import { AskRequest } from "../types/index.js";
+import { GenerateRequirementsRequest } from "../types/index.js";
+import { BYOK_USER_ID } from "../../lib/byok.js";
 
-export class AskController {
+export class RequirementsController {
   constructor(private sessionManager: SessionManager) {}
 
-  async ask(req: Request, res: Response) {
-    const { repository, repositoryPath, question, sessionId, agent, model } =
-      req.body as AskRequest;
-    const userId = req.session.userId!;
-    const githubToken = req.session.githubToken!;
+  private async fileExists(filePath?: string): Promise<boolean> {
+    if (!filePath) return false;
+    try {
+      const stat = await fs.stat(filePath);
+      return stat.isFile();
+    } catch {
+      return false;
+    }
+  }
+
+  private async resolveGeneratedDocPath(
+    expectedPath: string,
+    filename: string,
+    repoRoot: string
+  ): Promise<string> {
+    if (await this.fileExists(expectedPath)) {
+      return expectedPath;
+    }
+
+    const candidateRoots = [
+      // Preferred repo-scoped location
+      path.join(repoRoot, ".copilot-sdk-demo", "agent-gen-results"),
+      // Legacy location from earlier builds
+      path.join(os.homedir(), ".copilot-sdk-demo", "agent-gen-results"),
+    ];
+
+    for (const root of candidateRoots) {
+      const directCandidate = path.join(
+        root,
+        path.basename(path.dirname(expectedPath)),
+        filename
+      );
+      if (await this.fileExists(directCandidate)) {
+        return directCandidate;
+      }
+    }
+
+    return expectedPath;
+  }
+
+  async generateRequirements(req: Request, res: Response) {
+    const {
+      repository,
+      repositoryPath,
+      requirementsPrompt,
+      sessionId,
+      agent,
+      model,
+    } = req.body as GenerateRequirementsRequest;
+    const userId = BYOK_USER_ID;
 
     try {
       // Get or create session
       const sessionInfo = await this.sessionManager.getOrCreateSession(
         userId,
-        githubToken,
         repository,
         repositoryPath,
         sessionId,
@@ -66,10 +113,13 @@ export class AskController {
         const repoRoot =
           repositoryPath ?? path.join(getUserReposRoot(), repository);
 
-        let taskText = question;
+        let taskText = requirementsPrompt;
         if (agent === "document-generator") {
           const now = new Date();
-          const outputDir = await ensureAgentGenResultsDirForDate(now);
+          const outputDir = await ensureAgentGenResultsDirForRepository(
+            repoRoot,
+            now
+          );
           const timestamp = `${now.getFullYear()}-${String(
             now.getMonth() + 1
           ).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(
@@ -93,7 +143,7 @@ Output directory (write all generated files only under this path for this run): 
 Feature-level requirements output file (write exactly to this absolute path): ${featureDocPath}
 Final Business Requirements Document output file (write exactly to this absolute path): ${finalDocPath}
 
-${question}`;
+${requirementsPrompt}`;
         }
 
         // Build prompt - prefix with agent instruction if specified
@@ -102,8 +152,8 @@ ${question}`;
             ? `Use the @${agent} agent to answer this: ${taskText}`
             : taskText;
 
-        // Send question to Copilot with increased timeout (5 minutes)
-        await sessionInfo.session.sendAndWait({ prompt }, 300000);
+        // Send prompt to Copilot with increased timeout (15 minutes)
+        await sessionInfo.session.sendAndWait({ prompt }, 900000);
 
         // Send completion event with the last top-level response
         const completePayload: any = {
@@ -120,23 +170,36 @@ ${question}`;
           featureDocFilename &&
           finalDocFilename
         ) {
+          // Resolve actual files on disk in case the model wrote to a compatible
+          // repo-scoped/legacy output root different from the initially suggested path.
+          const resolvedFeaturePath = await this.resolveGeneratedDocPath(
+            featureDocPath,
+            featureDocFilename,
+            repoRoot
+          );
+          const resolvedFinalPath = await this.resolveGeneratedDocPath(
+            finalDocPath,
+            finalDocFilename,
+            repoRoot
+          );
+
           completePayload.documents = {
             repo: repository,
             outputDir: docOutputDir,
             feature: {
               filename: featureDocFilename,
-              path: featureDocPath,
+              path: resolvedFeaturePath,
             },
             final: {
               filename: finalDocFilename,
-              path: finalDocPath,
+              path: resolvedFinalPath,
             },
           };
         }
 
         res.write(`data: ${JSON.stringify(completePayload)}\n\n`);
       } catch (error: any) {
-        console.error("Error during question processing:", error);
+        console.error("Error during requirements generation:", error);
         res.write(
           `data: ${JSON.stringify({
             type: "error",
@@ -148,7 +211,7 @@ ${question}`;
         res.end();
       }
     } catch (error: any) {
-      console.error("Error in ask controller:", error);
+      console.error("Error in requirements controller:", error);
       res.status(500).json({ error: error.message });
     }
   }

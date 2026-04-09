@@ -1,28 +1,20 @@
-import { Session as ExpressSession } from "express-session";
-
-declare module "express-session" {
-  interface SessionData {
-    userId: string;
-    githubToken: string;
-    username: string;
-    oauthState: string;
-  }
-}
-
 export interface Repository {
   name: string;
   path: string;
 }
 
-export interface AskRequest {
+export interface GenerateRequirementsRequest {
   repository: string;
   /** Absolute path to the repository root (required when multiple roots exist). */
   repositoryPath?: string;
-  question: string;
+  requirementsPrompt: string;
   sessionId?: string;
   agent?: string;
   model?: string;
 }
+
+// Backward-compatible alias for existing imports while transitioning names.
+export type AskRequest = GenerateRequirementsRequest;
 
 export interface CopilotSessionInfo {
   sessionId: string;

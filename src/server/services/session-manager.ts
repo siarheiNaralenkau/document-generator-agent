@@ -8,7 +8,6 @@ export class SessionManager {
 
   async getOrCreateSession(
     userId: string,
-    githubToken: string,
     repository: string,
     repositoryPath: string | undefined,
     sessionId?: string,
@@ -39,7 +38,6 @@ export class SessionManager {
 
     return await this.copilotService.createSession(
       userId,
-      githubToken,
       repoPath,
       repository,
       selectedModel
